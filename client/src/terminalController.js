@@ -1,4 +1,5 @@
 import ComponentsBuilder from "./components.js";
+import { constants } from "./constants.js";
 
 export default class TerminalController {
   #usersCollors = new Map();
@@ -35,8 +36,44 @@ export default class TerminalController {
     };
   }
 
-  #registerEvents(eventEmitter, component) {
-    eventEmitter.on("message:received", this.#onMessageReceived(component));
+  #onLogChanged({ screen, activityLog }) {
+    return (msg) => {
+      const [userName] = msg.split(/\s/);
+      const collor = this.#getUserCollor(userName);
+      activityLog.addItem(`{${collor}}{bold}${msg.toString()}{/}`);
+
+      screen.render();
+    };
+  }
+
+  #onStatusChanged({ screen, status }) {
+    return (users) => {
+      const { content } = status.items.shift();
+      status.clearItems();
+      status.addItem(content);
+
+      users.forEach((userName) => {
+        const collor = this.#getUserCollor(userName);
+        status.addItem(`{${collor}}{bold}${userName}{/}`);
+      });
+
+      screen.render();
+    };
+  }
+
+  #registerEvents(eventEmitter, components) {
+    eventEmitter.on(
+      constants.events.app.MESSAGE_RECEIVED,
+      this.#onMessageReceived(components)
+    );
+    eventEmitter.on(
+      constants.events.app.ACTIVITYLOG_UPDATED,
+      this.#onLogChanged(components)
+    );
+    eventEmitter.on(
+      constants.events.app.STATUS_UPDATED,
+      this.#onStatusChanged(components)
+    );
   }
 
   async initializeTable(eventEmitter) {
@@ -45,6 +82,8 @@ export default class TerminalController {
       .setLayoutComponent()
       .setInputComponent(this.#onInputReceived(eventEmitter))
       .setChatComponent()
+      .setActivityLogComponent()
+      .setStatusComponent()
       .build();
 
     this.#registerEvents(eventEmitter, components);
@@ -52,15 +91,15 @@ export default class TerminalController {
     components.input.focus();
     components.screen.render();
 
-    setInterval(() => {
-      eventEmitter.emit("message:received", {
-        message: "Olá",
-        userName: "Ramon Mello",
-      });
-      eventEmitter.emit("message:received", {
-        message: "Olá",
-        userName: "Madara Maciel",
-      });
-    }, 2000);
+    // setInterval(() => {
+    const users = ["Ramon"];
+    eventEmitter.emit(constants.events.app.STATUS_UPDATED, users);
+    users.push("Ricardo");
+    eventEmitter.emit(constants.events.app.STATUS_UPDATED, users);
+    users.push("Samara");
+    eventEmitter.emit(constants.events.app.STATUS_UPDATED, users);
+    users.push("Madara");
+    eventEmitter.emit(constants.events.app.STATUS_UPDATED, users);
+    // }, 1500);
   }
 }
